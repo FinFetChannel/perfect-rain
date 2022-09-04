@@ -39,10 +39,10 @@ for key in keys:
     # sounds[key][0].set_volume(0)
     # sounds[key][0].play(-1)
 
-sounds['thunder'] = [[], [20], [50]] # samples, frequency, volume
+sounds['thunder'] = [[], [25], [25]] # samples, frequency, volume
 for i in range(3):
     sounds['thunder'][0].append(pg.mixer.Sound('thunder'+str(i)+'.ogg'))
-    sounds['thunder'][0][i].set_volume(0.5)
+    sounds['thunder'][0][i].set_volume(0.3)
 
 async def main():
     if sys.platform == 'emscripten':
@@ -78,51 +78,54 @@ async def main():
     rain_sprite = 0
     droplets_sprite = 0
     thunder_sprite = 4
+    change = 1
 
     while True:
         if lock_fps:
-            elapsed_time = 1
-            clock.tick(60)/1000
+            elapsed_time = clock.tick(60)/1000
+            
         else:
             elapsed_time = clock.tick()/1000
         
         timer += 60*elapsed_time
-        fps = 60/(elapsed_time+1e-6)
 
-        if options and (int(timer)%3 == 1 or fps > 30):
+        if change:
+            change = 0
             frame.blit(window, (0,0))
-
-        if int(timer)%3 == 1 or fps > 30:
             frame.blit(background[bg_sprite], (151,46))
             frame.blit(rain[rain_sprite], (151,46))
-        
-        if int(timer)%3 == 2 or fps > 30:
             frame.blit(tree[tree_sprite], (151,46))
             frame.blit(droplets[droplets_sprite], (151,46))
-        
+    
             if thunder_sprite > 0:
                 frame.blit(darker[thunder_sprite-1], (151,46))
 
-            for event in pg.event.get():
-                if event.type == pg.QUIT:
-                    running = 0
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                running = 0
         
         if timer < 250:
             for key in keys:
                 sounds[key][0].set_volume(timer*0.001)
         
         if int(timer)%59 == 0:
+            change = 1
             bg_sprite = (bg_sprite + 1)%4
         if int(timer)%27 == 0:
+            change = 1
             rain_sprite = (rain_sprite + 1)%4
         if int(timer)%43 == 0:
+            change = 1
             droplets_sprite = (droplets_sprite + 1)%4
         if int(timer)%77 == 0:
+            change = 1
             tree_sprite = (tree_sprite + 1)%3
         if thunder_sprite < 4 and int(timer)%11 == 0:
+            change = 1
             thunder_sprite +=1
         if int(timer)%83 == 0 and thunder_sprite == 4:
             if random.randint(0,100) < sounds['thunder'][1][0]:
+                change = 1
                 thunder_sprite = 0
                 sample = random.randint(0,len(sounds['thunder'][0]) - 1)
                 sounds['thunder'][0][sample].set_volume(sounds['thunder'][2][0]*0.01)
@@ -139,30 +142,24 @@ async def main():
             clicked = 0
         
         if clicked and options_rect.collidepoint(mouse_pos) and timer > delay:
+            change = 1
             options = not(options)
-            frame.blit(window, (0,0))
-            delay = timer + 600
+            delay = timer + 60
 
         if options:
-            if int(timer)%3 == 2  or fps > 30:
-                # frame.blit(window, (0,0))
-                frame.blit(font.render('Adjust sound volumes and thunder strike frequency.', 0, (255, 255, 255)), ((250, 575)))
-                frame.blit(font.render('thunder', 0, (255, 255, 255)), ((570, 25)))
-                frame.blit(font.render('strikes', 0, (255, 255, 255)), ((670, 25)))
+            frame.blit(font.render('Adjust sound volumes and thunder strike frequency.', 0, (255, 255, 255)), ((250, 575)))
+            frame.blit(font.render('thunder', 0, (255, 255, 255)), ((570, 25)))
+            frame.blit(font.render('strikes', 0, (255, 255, 255)), ((670, 25)))
 
-            
-            if int(timer)%3 == 0  or fps > 30:
-                for i in range(len(sounds)-1):
-                    frame.blit(font.render(keys[i], 0, (255, 255, 255)), ((75+i*100, 25)))
-                    slider((75+i*100, 50), slider_bg, slider_handle, frame, mouse_pos, clicked, sounds[keys[i]][0])
-                    
-                slider((575, 50), slider_bg, slider_handle, frame, mouse_pos, clicked, sounds['thunder'][2])
-                slider((675, 50), slider_bg, slider_handle, frame, mouse_pos, clicked, sounds['thunder'][1])
+            for i in range(len(sounds)-1):
+                frame.blit(font.render(keys[i], 0, (255, 255, 255)), ((75+i*100, 25)))
+                change = slider((75+i*100, 50), slider_bg, slider_handle, frame, mouse_pos, clicked, sounds[keys[i]][0], change)
+                
+            change = slider((575, 50), slider_bg, slider_handle, frame, mouse_pos, clicked, sounds['thunder'][2], change)
+            change = slider((675, 50), slider_bg, slider_handle, frame, mouse_pos, clicked, sounds['thunder'][1], change = 1)
 
-        if int(timer)%3 == 0  or fps > 30:
-            frame.blit(options_img[options], (765, 10))
-            # frame.blit(font.render(str(fps), 0, [255, 255, 255]), [400,400])
-            screen.blit(frame, (0,0))
+        frame.blit(options_img[options], (765, 10))
+        screen.blit(frame, (0,0))
 
         pg.display.update()
         
@@ -172,7 +169,7 @@ async def main():
             pg.quit()
             return
 
-def slider(coords, background, handle, frame, mouse_pos, clicked, sound):
+def slider(coords, background, handle, frame, mouse_pos, clicked, sound, change):
 
     frame.blit(background, coords)
     size = list(background.get_size())
@@ -185,6 +182,7 @@ def slider(coords, background, handle, frame, mouse_pos, clicked, sound):
     else:
         position = sound.get_volume()
     if clicked and rect.collidepoint(mouse_pos[0], mouse_pos[1]-handle.get_size()[1]/2):
+        change = 1
         position = 1 - (mouse_pos[1]-coords[1]-handle.get_size()[1]/2)/size[1]
         if type(sound) == list:
             sound[0] = int(position*100)
@@ -192,7 +190,7 @@ def slider(coords, background, handle, frame, mouse_pos, clicked, sound):
             sound.set_volume(position)
 
     frame.blit(handle, (coords[0], coords[1] + size[1]*(1-position)))
-
+    return change
 
 asyncio.run( main() )
 
